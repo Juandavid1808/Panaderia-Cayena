@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, ShoppingBag, DollarSign, Clock, Users, Calendar, CreditCard, Download, Filter, RefreshCw } from 'lucide-react';
+import { Package, ShoppingBag, DollarSign, Clock, Users, Calendar, CreditCard, Download, Filter, RefreshCw, Plus, FileText, Layers, Image } from 'lucide-react';
 // 🚀 SECCIÓN BLINDADA
 import { SeccionGestionAdmins } from '../components/SeccionGestionAdmins';
-
+import Swal from 'sweetalert2';
 
 // Tipados para robustecer el proyecto
 interface Pedido {
@@ -37,6 +37,18 @@ export const AdminDashboard = () => {
   const [usuarioLogueado, setUsuarioLogueado] = useState<any>(null);
   const [cargando, setCargando] = useState<boolean>(true);
   const [esAdmin, setEsAdmin] = useState<boolean>(false);
+
+  // NUEVOS ESTADOS PARA MODAL DE AGREGAR PRODUCTO
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [guardandoProducto, setGuardandoProducto] = useState<boolean>(false);
+  const [nuevoProducto, setNuevoProducto] = useState({
+    nombre: '',
+    precio: '',
+    descripcion: '',
+    stock: '',
+    imagen_url: '',
+    categoria: 'desayunos'
+  });
 
   const categoriesCayena = ['Desayunos', 'Panadería', 'Pastelería', 'Línea amarilla', 'Bebidas'];
 
@@ -123,16 +135,81 @@ export const AdminDashboard = () => {
     fetchProductos();
   };
 
+  // LÓGICA PARA INSERTAR EL NUEVO PRODUCTO EN SUPABASE
+  const handleGuardarProducto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGuardandoProducto(true);
+
+    if (!nuevoProducto.nombre || !nuevoProducto.precio || !nuevoProducto.stock) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Campos obligatorios',
+        text: 'Por favor completa Nombre, Precio y Stock.',
+        customClass: { popup: 'rounded-[30px]' }
+      });
+      setGuardandoProducto(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('productos')
+        .insert([
+          {
+            nombre: nuevoProducto.nombre,
+            precio: parseInt(nuevoProducto.precio),
+            descripcion: nuevoProducto.descripcion || 'Tradicional y calientito',
+            stock: parseInt(nuevoProducto.stock),
+            imagen_url: nuevoProducto.imagen_url || 'https://th.bing.com/th/id/OIP.8-L_OC7-C9X3A63A50B0F9B',
+            categoria: nuevoProducto.categoria.toLowerCase() // Lo guardamos en minúscula tal cual está en tu DB
+          }
+        ]);
+
+      if (error) throw error;
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Producto Agregado!',
+        text: `"${nuevoProducto.nombre}" ya está en el inventario de Cayena.`,
+        timer: 2000,
+        showConfirmButton: false,
+        customClass: { popup: 'rounded-[30px]' }
+      });
+
+      // Limpiar formulario y cerrar modal
+      setNuevoProducto({
+        nombre: '',
+        precio: '',
+        descripcion: '',
+        stock: '',
+        imagen_url: '',
+        categoria: 'desayunos'
+      });
+      setIsModalOpen(false);
+      
+      // Recargar lista local de productos de inmediato
+      fetchProductos();
+
+    } catch (error: any) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al guardar',
+        text: error.message || 'Inténtalo de nuevo.',
+        customClass: { popup: 'rounded-[30px]' }
+      });
+    } finally {
+      setGuardandoProducto(false);
+    }
+  };
+
   // 📄 FUNCIÓN MEJORADA: Anti-bloqueo de popups y carga asíncrona segura
   const descargarFactura = async (pedido: Pedido) => {
-    // 1. Abrimos la pestaña inmediatamente en el hilo del click para engañar al bloqueador del navegador
     const ventanaImpresion = window.open('', '_blank');
     if (!ventanaImpresion) {
       alert("Por favor, permite los pop-ups para poder imprimir las facturas de Cayena.");
       return;
     }
 
-    // Ponemos un loader temporal en la pestaña nueva mientras carga de Supabase
     ventanaImpresion.document.write(`<html><head><title>Cargando Factura...</title></head><body style="font-family:sans-serif; text-align:center; padding-top:50px; color:#666;"><p>Generando comprobante Cayena...</p></body></html>`);
 
     try {
@@ -165,7 +242,6 @@ export const AdminDashboard = () => {
         `;
       }).join('');
 
-      // Limpiamos e inyectamos el HTML real
       ventanaImpresion.document.open();
       ventanaImpresion.document.write(`
         <html>
@@ -449,9 +525,19 @@ export const AdminDashboard = () => {
         {/* PESTAÑA 2: INVENTARIO */}
         {activeTab === 'inventario' && (
           <div className="space-y-10">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Administrar Productos 🥖</h2>
-              <p className="text-sm text-gray-400 mt-1">Inventario total clasificado por líneas de producción.</p>
+            {/* CABECERA DE INVENTARIO CON BOTÓN UNIFICADO */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 dark:border-slate-800 pb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Administrar Productos 🥖</h2>
+                <p className="text-sm text-gray-400 mt-1">Inventario total clasificado por líneas de producción.</p>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="bg-[#b49770] hover:bg-[#c4a67d] text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-md transition-all active:scale-95 text-sm"
+              >
+                <Plus size={18} />
+                Agregar Producto
+              </button>
             </div>
 
             {!productos || productos.length === 0 ? (
@@ -492,6 +578,137 @@ export const AdminDashboard = () => {
         )}
 
       </div>
+
+      {/* MODAL PARA NUEVO PRODUCTO (SOPORTE LIGHT/DARK MODE) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-[35px] w-full max-w-lg p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto border border-gray-100 dark:border-slate-800">
+            
+            <h3 className="text-2xl font-black text-gray-800 dark:text-slate-100 mb-2 flex items-center gap-2">
+              <Package className="text-[#b49770]" size={24} />
+              Nuevo Producto
+            </h3>
+            <p className="text-gray-400 dark:text-slate-400 text-sm mb-6">Completa los datos para guardarlo directo en el inventario.</p>
+
+            <form onSubmit={handleGuardarProducto} className="space-y-4 text-left">
+              {/* NOMBRE */}
+              <div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">Nombre del Producto *</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-800 dark:text-slate-100 font-medium focus:outline-none focus:border-[#b49770]"
+                    placeholder="Ej: Desayuno Opita"
+                    value={nuevoProducto.nombre}
+                    onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})}
+                  />
+                  <Package className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* PRECIO */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">Precio ($ COP) *</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-800 dark:text-slate-100 font-bold focus:outline-none focus:border-[#b49770]"
+                      placeholder="25000"
+                      value={nuevoProducto.precio}
+                      onChange={(e) => setNuevoProducto({...nuevoProducto, precio: e.target.value})}
+                    />
+                    <DollarSign className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                  </div>
+                </div>
+
+                {/* STOCK */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">Stock Inicial *</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-800 dark:text-slate-100 font-bold focus:outline-none focus:border-[#b49770]"
+                      placeholder="15"
+                      value={nuevoProducto.stock}
+                      onChange={(e) => setNuevoProducto({...nuevoProducto, stock: e.target.value})}
+                    />
+                    <Layers className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                  </div>
+                </div>
+              </div>
+
+              {/* CATEGORÍA */}
+              <div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">Categoría</label>
+                <div className="relative">
+                  <select
+                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-700 dark:text-slate-200 font-bold focus:outline-none focus:border-[#b49770] appearance-none"
+                    value={nuevoProducto.categoria}
+                    onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})}
+                  >
+                    {categoriesCayena.map((cat) => (
+                      <option key={cat} value={cat.toLowerCase()}>{cat}</option>
+                    ))}
+                  </select>
+                  <Layers className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                </div>
+              </div>
+
+              {/* DESCRIPCIÓN */}
+              <div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">Descripción corta</label>
+                <div className="relative">
+                  <textarea
+                    rows={2}
+                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-600 dark:text-slate-300 focus:outline-none focus:border-[#b49770] text-sm"
+                    placeholder="Ej: Delicioso tamal con chocolate calientito..."
+                    value={nuevoProducto.descripcion}
+                    onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})}
+                  />
+                  <FileText className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                </div>
+              </div>
+
+              {/* URL IMAGEN */}
+              <div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">Enlace de la Imagen (URL)</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-500 dark:text-slate-400 text-xs focus:outline-none focus:border-[#b49770]"
+                    placeholder="https://ejemplo.com/imagen.png"
+                    value={nuevoProducto.imagen_url}
+                    onChange={(e) => setNuevoProducto({...nuevoProducto, imagen_url: e.target.value})}
+                  />
+                  <Image className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                </div>
+              </div>
+
+              {/* BOTONES ACCIÓN */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="w-1/2 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoProducto}
+                  className="w-1/2 bg-[#b49770] hover:bg-[#c4a67d] text-white font-black py-3.5 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {guardandoProducto ? 'Guardando...' : 'Crear Producto'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
