@@ -1,19 +1,30 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react'; // 🚀 Importamos useMemo para forzar reactividad móvil
 import { useCart } from '../context/CartContext';
 import { Trash2, ArrowLeft, ShoppingBag, Edit2, CreditCard, Truck, Store } from 'lucide-react'; 
 import { Link, useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 
 const CartPage = () => {
-  const { cart, removeFromCart, updateQuantity, totalPrice, totalItems } = useCart();
+  const { cart, removeFromCart, updateQuantity } = useCart();
   const navigate = useNavigate(); 
 
   // Estado para controlar el tipo de entrega (por defecto domicilio)
   const [tipoEntrega, setTipoEntrega] = useState<'domicilio' | 'recoger'>('domicilio');
 
   const TARIFA_DOMICILIO = 4000;
+
+  // 🚀 FUERZA DE PRECIO PARA CELULARES: Calculamos el total de productos y precio localmente
+  // Esto asegura que cada vez que cambie el arreglo 'cart' en el móvil, las sumas cambien sí o sí.
+  const localTotalPrice = useMemo(() => {
+    return cart.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+  }, [cart]);
+
+  const localTotalItems = useMemo(() => {
+    return cart.reduce((acc, item) => acc + item.cantidad, 0);
+  }, [cart]);
+
   // Si elige domicilio se suman los 4000, si es para recoger se mantiene el precio base
-  const totalFinal = tipoEntrega === 'domicilio' ? totalPrice + TARIFA_DOMICILIO : totalPrice;
+  const totalFinal = tipoEntrega === 'domicilio' ? localTotalPrice + TARIFA_DOMICILIO : localTotalPrice;
 
   const confirmarEliminacion = (id: string, nombre: string) => {
     Swal.fire({
@@ -58,8 +69,8 @@ const CartPage = () => {
       }
     }).then((result) => {
       if (result.isConfirmed) {
-  updateQuantity(id, parseInt(result.value), undefined as any);
-}
+        updateQuantity(id, parseInt(result.value), undefined as any);
+      }
     });
   };
 
@@ -92,9 +103,14 @@ const CartPage = () => {
             <div key={item.id} className="bg-white p-6 rounded-[30px] border border-gray-100 flex items-center gap-6 shadow-sm">
               <img src={item.imagen_url || '/placeholder-bread.png'} alt={item.nombre} className="w-24 h-24 object-cover rounded-2xl" />
               <div className="flex-grow">
-                <h3 className="text-xl font-bold text-gray-800">{item.nombre}</h3>
+                <h3 className="text-xl font-bold text-gray-800">
+                  {item.nombre}
+                </h3>
                 <p className="text-gray-400 text-sm italic">Cantidad: {item.cantidad}</p>
-                <p className="text-[#b49770] font-black mt-1">${(item.precio * item.cantidad).toLocaleString('es-CO')}</p>
+                {/* Multiplicación directa vinculada al renderizado del array en el celular */}
+                <p className="text-[#b49770] font-black mt-1">
+                  ${(item.precio * item.cantidad).toLocaleString('es-CO')}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => editarCantidad(item.id, item.nombre, item.cantidad, item.imagen_url)} className="p-4 text-blue-400 hover:bg-blue-50 rounded-2xl transition-colors">
@@ -148,7 +164,7 @@ const CartPage = () => {
           {/* TOTALES */}
           <div className="flex justify-between items-center">
             <span className="opacity-60 font-bold uppercase text-xs tracking-widest">
-              Resumen ({totalItems} productos)
+              Resumen ({localTotalItems} productos)
             </span>
             <span className="text-2xl font-black">${totalFinal.toLocaleString('es-CO')}</span>
           </div>
@@ -157,7 +173,7 @@ const CartPage = () => {
 
           <div className="flex flex-col gap-4">
             <button 
-              onClick={() => navigate('/checkout', { state: { tipoEntrega } })} // Pasamos el tipo de entrega al checkout
+              onClick={() => navigate('/checkout', { state: { tipoEntrega } })}
               className="w-full bg-[#b49770] hover:bg-[#c4a67d] text-white py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg"
             >
               <CreditCard size={24} />
@@ -165,7 +181,7 @@ const CartPage = () => {
             </button>
             <p className="text-center text-xs opacity-40 italic">
               {tipoEntrega === 'domicilio' 
-                ? 'Podrás ingresar tu dirección de Neiva en el siguiente paso.' 
+                ? 'Podrás ingresar tu dirección en el siguiente paso.' 
                 : 'Te daremos la información para recoger tu pedido en el siguiente paso.'}
             </p>
           </div>
