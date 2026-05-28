@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, ShoppingBag, DollarSign, Clock, Users, Calendar, CreditCard, Download, Filter, RefreshCw, Plus, FileText, Layers, Image } from 'lucide-react';
+import { Package, ShoppingBag, DollarSign, Clock, Users, Calendar, CreditCard, Download, Filter, RefreshCw, Plus, Layers, Image } from 'lucide-react';
 // 🚀 SECCIÓN BLINDADA
 import { SeccionGestionAdmins } from '../components/SeccionGestionAdmins';
 import Swal from 'sweetalert2';
@@ -47,7 +47,7 @@ export const AdminDashboard = () => {
     descripcion: '',
     stock: '',
     imagen_url: '',
-    categoria: 'desayunos'
+    categoria: 'Desayunos' // Inicializado con una de las opciones oficiales
   });
 
   const categoriesCayena = ['Desayunos', 'Panadería', 'Pastelería', 'Línea amarilla', 'Bebidas'];
@@ -152,6 +152,13 @@ export const AdminDashboard = () => {
     }
 
     try {
+      // 🚀 BLINDAJE: Limpiamos la categoría quitando tildes y mayúsculas de manera exacta
+      const categoriaLimpia = nuevoProducto.categoria
+        .toLowerCase()
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
       const { error } = await supabase
         .from('productos')
         .insert([
@@ -161,7 +168,7 @@ export const AdminDashboard = () => {
             descripcion: nuevoProducto.descripcion || 'Tradicional y calientito',
             stock: parseInt(nuevoProducto.stock),
             imagen_url: nuevoProducto.imagen_url || 'https://th.bing.com/th/id/OIP.8-L_OC7-C9X3A63A50B0F9B',
-            categoria: nuevoProducto.categoria.toLowerCase() // Lo guardamos en minúscula tal cual está en tu DB
+            categoria: categoriaLimpia // Se guarda "linea amarilla", "panaderia", etc.
           }
         ]);
 
@@ -183,7 +190,7 @@ export const AdminDashboard = () => {
         descripcion: '',
         stock: '',
         imagen_url: '',
-        categoria: 'desayunos'
+        categoria: 'Desayunos'
       });
       setIsModalOpen(false);
       
@@ -545,7 +552,7 @@ export const AdminDashboard = () => {
             ) : (
               <div className="space-y-12">
                 {categoriesCayena.map((cat) => {
-                  const productosFiltrados = productos.filter((prod) => prod?.categoria?.toLowerCase() === cat.toLowerCase());
+                  const productosFiltrados = productos.filter((prod) => prod?.categoria?.toLowerCase() === cat.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
                   if (productosFiltrados.length === 0) return null;
                   return (
                     <div key={cat} className="space-y-4 border-b border-gray-100 dark:border-slate-800/60 pb-8 last:border-none last:pb-0">
@@ -632,7 +639,7 @@ export const AdminDashboard = () => {
                       type="number"
                       required
                       className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-800 dark:text-slate-100 font-bold focus:outline-none focus:border-[#b49770]"
-                      placeholder="15"
+                      placeholder="50"
                       value={nuevoProducto.stock}
                       onChange={(e) => setNuevoProducto({...nuevoProducto, stock: e.target.value})}
                     />
@@ -641,46 +648,42 @@ export const AdminDashboard = () => {
                 </div>
               </div>
 
-              {/* CATEGORÍA */}
+              {/* CATEGORÍA SELECT */}
               <div>
-                <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">Categoría</label>
-                <div className="relative">
-                  <select
-                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-700 dark:text-slate-200 font-bold focus:outline-none focus:border-[#b49770] appearance-none"
-                    value={nuevoProducto.categoria}
-                    onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})}
-                  >
-                    {categoriesCayena.map((cat) => (
-                      <option key={cat} value={cat.toLowerCase()}>{cat}</option>
-                    ))}
-                  </select>
-                  <Layers className="absolute left-3 top-3.5 text-gray-400" size={16} />
-                </div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">Categoría de Producción *</label>
+                <select
+                  className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 px-4 text-gray-800 dark:text-slate-100 font-medium focus:outline-none focus:border-[#b49770]"
+                  value={nuevoProducto.categoria}
+                  onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})}
+                >
+                  {categoriesCayena.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* DESCRIPCIÓN */}
               <div>
                 <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">Descripción corta</label>
-                <div className="relative">
-                  <textarea
-                    rows={2}
-                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-600 dark:text-slate-300 focus:outline-none focus:border-[#b49770] text-sm"
-                    placeholder="Ej: Delicioso tamal con chocolate calientito..."
-                    value={nuevoProducto.descripcion}
-                    onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})}
-                  />
-                  <FileText className="absolute left-3 top-3.5 text-gray-400" size={16} />
-                </div>
+                <textarea
+                  className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 px-4 text-gray-800 dark:text-slate-100 font-medium focus:outline-none focus:border-[#b49770]"
+                  placeholder="Ej: Delicioso cruasán relleno de chocolate..."
+                  rows={2}
+                  value={nuevoProducto.descripcion}
+                  onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})}
+                />
               </div>
 
-              {/* URL IMAGEN */}
+              {/* URL DE IMAGEN */}
               <div>
-                <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">Enlace de la Imagen (URL)</label>
+                <label className="block text-xs font-bold text-gray-400 dark:text-slate-400 uppercase mb-1">URL de la Imagen</label>
                 <div className="relative">
                   <input
-                    type="text"
-                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-500 dark:text-slate-400 text-xs focus:outline-none focus:border-[#b49770]"
-                    placeholder="https://ejemplo.com/imagen.png"
+                    type="url"
+                    className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl py-3 pl-10 pr-4 text-gray-800 dark:text-slate-100 font-medium focus:outline-none focus:border-[#b49770]"
+                    placeholder="https://ejemplo.com/imagen.jpg"
                     value={nuevoProducto.imagen_url}
                     onChange={(e) => setNuevoProducto({...nuevoProducto, imagen_url: e.target.value})}
                   />
@@ -688,21 +691,21 @@ export const AdminDashboard = () => {
                 </div>
               </div>
 
-              {/* BOTONES ACCIÓN */}
-              <div className="flex gap-3 pt-4">
+              {/* ACCIONES DEL MODAL */}
+              <div className="flex gap-4 pt-4 border-t border-gray-100 dark:border-slate-800 mt-6">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="w-1/2 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+                  className="flex-1 border border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 py-3 rounded-2xl font-bold text-sm transition hover:bg-gray-50 dark:hover:bg-slate-950"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={guardandoProducto}
-                  className="w-1/2 bg-[#b49770] hover:bg-[#c4a67d] text-white font-black py-3.5 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50"
+                  className="flex-1 bg-[#b49770] hover:bg-[#a3865f] text-white py-3 rounded-2xl font-bold text-sm shadow-md transition disabled:opacity-50"
                 >
-                  {guardandoProducto ? 'Guardando...' : 'Crear Producto'}
+                  {guardandoProducto ? 'Guardando...' : 'Guardar Producto'}
                 </button>
               </div>
             </form>
