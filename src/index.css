@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+/* Configuración nativa de modo oscuro para Tailwind v4 */
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-cayena-gold: #b8966c;
+  --color-cayena-dark: #4a3228;
+}
