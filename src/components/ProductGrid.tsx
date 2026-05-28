@@ -116,7 +116,6 @@ const ProductDetailModal = ({ producto, onClose }: { producto: Producto, onClose
                   {estaAgotado ? 0 : cantidad}
                 </span>
                 <button 
-                  // CORREGIDO: Bloquea el aumento si llega al stock máximo disponible
                   onClick={() => setCantidad(prev => prev < producto.stock ? prev + 1 : prev)}
                   disabled={estaAgotado || cantidad >= producto.stock}
                   className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm text-gray-400 hover:text-[#b49770] disabled:opacity-40 disabled:cursor-not-allowed"
@@ -214,7 +213,7 @@ const ProductCard = ({ producto }: { producto: Producto }) => {
   );
 };
 
-// 4. GRID PRINCIPAL (Se mantiene intacto mapeando los datos reales)
+// 4. GRID PRINCIPAL (NORMALIZADO PARA TRADUCIR CATEGORÍAS)
 const ProductGrid = () => {
   const { categoria } = useParams<{ categoria: string }>();
   const navigate = useNavigate();
@@ -235,7 +234,15 @@ const ProductGrid = () => {
         if (categoria === 'busqueda' && queryTerm) {
           query = query.or(`nombre.ilike.%${queryTerm}%,descripcion.ilike.%${queryTerm}%`);
         } else if (categoria && categoria !== 'busqueda') {
-          query = query.eq('categoria', categoria);
+          // 🚀 AQUÍ SE HACE LA MAGIA:
+          // Transforma "linea-amarilla" -> "linea amarilla", "Panadería" -> "panaderia"
+          const categoriaNormalizada = categoria
+            .toLowerCase()
+            .replace(/-/g, ' ')
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+
+          query = query.eq('categoria', categoriaNormalizada);
         }
 
         const { data, error: supabaseError } = await query;
@@ -244,8 +251,8 @@ const ProductGrid = () => {
       } catch (err: any) {
         setError(err.message);
       } finally { 
-  setLoading(false);
-}
+        setLoading(false);
+      }
     };
     fetchProductos();
   }, [categoria, queryTerm]);
@@ -282,7 +289,7 @@ const ProductGrid = () => {
           </div>
           <h2 className="text-3xl font-black text-gray-800">No hay coincidencias</h2>
           <p className="text-gray-400 mt-3 max-w-sm px-6">
-            No encontramos productos para "<span className="text-[#b49770] font-bold italic">{queryTerm}</span>". 
+            No encontramos productos para "<span className="text-[#b49770] font-bold italic">{queryTerm || categoria?.replace('-', ' ')}</span>". 
             ¡Intenta con otra delicia!
           </p>
           <button 
