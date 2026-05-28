@@ -1,0 +1,15 @@
+{
+  "short_name": "Cayena",
+  "name": "Panaderia Cayena",
+  "icons": [
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ],
+  "start_url": "./",
+  "display": "standalone",
+  "theme_color": "#b49770",
+  "background_color": "#ffffff"
+}
