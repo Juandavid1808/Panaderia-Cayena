@@ -58,8 +58,8 @@ const CartPage = () => {
       }
     }).then((result) => {
       if (result.isConfirmed) {
-        updateQuantity(id, parseInt(result.value));
-      }
+  updateQuantity(id, parseInt(result.value), undefined as any);
+}
     });
   };
 

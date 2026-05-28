@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-  ShoppingCart, Search, Menu, X, LogOut, 
-  ClipboardList, MapPin, Sun, Moon, ChevronDown, LayoutDashboard 
+  ShoppingCart, Search, X, LogOut, 
+  ClipboardList, MapPin, Sun, Moon, ChevronDown, LayoutDashboard,
+  Coffee, Utensils, Cake, Layers, Flame, Calendar
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -30,10 +31,8 @@ const Navbar = () => {
     }
 
     try {
-      // 1. Respaldo fijo para tu cuenta principal
       const esTuCorreo = sessionUser.email === 'juandavidbelrrocu@gmail.com'; 
 
-      // 2. Consulta asíncrona a Supabase usando el ID del usuario autenticado
       const { data: perfil, error } = await supabase
         .from('profiles')
         .select('rol')
@@ -44,10 +43,7 @@ const Navbar = () => {
         console.error("Error al validar rol en la base de datos:", error.message);
       }
 
-      // 3. Verificamos si tiene el rol configurado en la tabla profiles
       const esAdminEnBD = perfil?.rol === 'admin' || perfil?.rol === 'ADMIN';
-
-      // Se otorga el permiso si cumple cualquiera de las dos condiciones
       setIsAdmin(esTuCorreo || esAdminEnBD);
 
     } catch (err) {
@@ -57,7 +53,6 @@ const Navbar = () => {
   };
 
   useEffect(() => {
-    // Carga de sesión al montar el componente
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentBarsUser = session?.user ?? null;
       setUser(currentBarsUser);
@@ -66,7 +61,6 @@ const Navbar = () => {
       }
     });
 
-    // Escucha de cambios de autenticación en tiempo real
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentBarsUser = session?.user ?? null;
       setUser(currentBarsUser);
@@ -136,7 +130,7 @@ const Navbar = () => {
         <span className="text-[10px] md:text-xs italic text-gray-800 dark:text-slate-400 uppercase">panadería . café</span>
       </Link>
 
-      {/* MENÚ CENTRAL */}
+      {/* MENÚ CENTRAL (Escritorio) */}
       <ul className="hidden lg:flex space-x-10 text-sm font-medium text-gray-700 dark:text-slate-300">
         <li><Link to="/productos/desayunos" className="hover:text-[#b49770] dark:hover:text-[#b49770] transition">Desayunos</Link></li>
         <li><Link to="/productos/panaderia" className="hover:text-[#b49770] dark:hover:text-[#b49770] transition">Panadería</Link></li>
@@ -184,7 +178,7 @@ const Navbar = () => {
           )}
         </Link>
         
-        {/* MI CUENTA */}
+        {/* MI CUENTA / MENÚ DESPLEGABLE */}
         <div className="relative" ref={menuRef}>
           {user ? (
             <div className="flex items-center gap-2">
@@ -201,7 +195,7 @@ const Navbar = () => {
               {menuOpen && (
                 <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 rounded-[24px] shadow-xl border border-gray-100 dark:border-slate-800 py-3 animate-in fade-in slide-in-from-top-3 duration-200 z-[60] text-left">
                   
-                  {/* Encabezado */}
+                  {/* Encabezado Perfil */}
                   <div className="px-4 py-2.5 border-b border-gray-50 dark:border-slate-800">
                     <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase font-black tracking-widest">Sesión iniciada</p>
                     <p className="text-sm font-bold text-gray-700 dark:text-slate-200 truncate mt-0.5">
@@ -209,10 +203,24 @@ const Navbar = () => {
                     </p>
                   </div>
                   
-                  {/* Bloque: Gestión de Cuenta */}
+                  {/* === SECCIÓN EXCLUSIVA MÓVIL: CATEGORÍAS (Oculto en pantallas LG) === */}
+                  <div className="block lg:hidden px-1.5 py-1">
+                    <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase font-black tracking-widest px-3 pt-1 pb-2">Categorías</p>
+                    <div className="space-y-0.5">
+                      <DropdownLink to="/productos/desayunos" icon={<Utensils size={16} />} label="Desayunos" onClick={() => setMenuOpen(false)} />
+                      <DropdownLink to="/productos/panaderia" icon={<Layers size={16} />} label="Panadería" onClick={() => setMenuOpen(false)} />
+                      <DropdownLink to="/productos/pasteleria" icon={<Cake size={16} />} label="Pastelería" onClick={() => setMenuOpen(false)} />
+                      <DropdownLink to="/productos/linea-amarilla" icon={<Flame size={16} />} label="Línea Amarilla" onClick={() => setMenuOpen(false)} />
+                      <DropdownLink to="/productos/bebidas" icon={<Coffee size={16} />} label="Bebidas" onClick={() => setMenuOpen(false)} />
+                      <DropdownLink to="/horarios" icon={<Calendar size={16} />} label="Horarios de Atención" onClick={() => setMenuOpen(false)} />
+                    </div>
+                    <div className="h-[1px] bg-gray-100 dark:bg-slate-800 my-2 mx-4"></div>
+                  </div>
+
+                  {/* Bloque: Gestión de Cuenta (Visible en todos los dispositivos) */}
                   <div className="p-1.5 space-y-0.5">
+                    <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase font-black tracking-widest px-3 pb-1 block lg:hidden">Usuario</p>
                     
-                    {/* Botón condicional de administrador leyendo el estado dinámico */}
                     {isAdmin && (
                       <DropdownLink 
                         to="/admin" 
@@ -240,7 +248,7 @@ const Navbar = () => {
                         <span>Modo Oscuro</span>
                       </div>
                       
-                      <div className={`w-8 h-4.5 rounded-full p-0.5 transition-colors duration-200 ${darkMode ? 'bg-[#b49770]' : 'bg-gray-200 dark:bg-slate-700'}`}>
+                      <div className="w-8 h-4.5 rounded-full p-0.5 transition-colors duration-200 ${darkMode ? 'bg-[#b49770]' : 'bg-gray-200 dark:bg-slate-700'}">
                         <div className={`w-3.5 h-3.5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${darkMode ? 'translate-x-3.5' : 'translate-x-0'}`} />
                       </div>
                     </button>
@@ -273,7 +281,6 @@ const Navbar = () => {
           )}
         </div>
 
-        <Menu className="w-6 h-6 lg:hidden text-gray-800 dark:text-slate-200 cursor-pointer" />
       </div>
     </nav>
   );
