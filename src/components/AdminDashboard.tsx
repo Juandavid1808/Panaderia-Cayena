@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, ShoppingBag, DollarSign, Clock, Users, Calendar, CreditCard, Download, Filter, RefreshCw, Plus, Layers, Image } from 'lucide-react';
+import { Package, ShoppingBag, DollarSign, Clock, Users, Calendar, CreditCard, Download, Filter, RefreshCw, Plus, Layers, Image, Edit2, Trash2 } from 'lucide-react';
 // 🚀 SECCIÓN BLINDADA
 import { SeccionGestionAdmins } from '../components/SeccionGestionAdmins';
 import Swal from 'sweetalert2';
@@ -22,6 +22,8 @@ interface Producto {
   precio: number;
   stock: number;
   categoria: string;
+  descripcion?: string;
+  imagen_url?: string;
 }
 
 export const AdminDashboard = () => {
@@ -38,19 +40,34 @@ export const AdminDashboard = () => {
   const [cargando, setCargando] = useState<boolean>(true);
   const [esAdmin, setEsAdmin] = useState<boolean>(false);
 
-  // NUEVOS ESTADOS PARA MODAL DE AGREGAR PRODUCTO
+  // ESTADOS PARA MODAL DE AGREGAR / EDITAR PRODUCTO
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [idProductoSeleccionado, setIdProductoSeleccionado] = useState<string | null>(null);
   const [guardandoProducto, setGuardandoProducto] = useState<boolean>(false);
+  
   const [nuevoProducto, setNuevoProducto] = useState({
     nombre: '',
     precio: '',
     descripcion: '',
     stock: '',
     imagen_url: '',
-    categoria: 'Desayunos' // Inicializado con una de las opciones oficiales
+    categoria: 'Desayunos' 
   });
 
   const categoriesCayena = ['Desayunos', 'Panadería', 'Pastelería', 'Línea amarilla', 'Bebidas'];
+
+  // Diccionario inverso para rellenar el select del modal cuando edites (vuelve a poner la primera letra en mayúscula y tildes)
+  const mapCategoriaToFrontend = (catLimpia: string): string => {
+    const mapeo: { [key: string]: string } = {
+      'desayunos': 'Desayunos',
+      'panaderia': 'Panadería',
+      'pasteleria': 'Pastelería',
+      'linea amarilla': 'Línea amarilla',
+      'bebidas': 'Bebidas'
+    };
+    return mapeo[catLimpia.toLowerCase().trim()] || 'Desayunos';
+  };
 
   // 1. CARGAR DATOS, VALIDAR ROL Y ESCUCHAR EN TIEMPO REAL
   useEffect(() => {
@@ -135,7 +152,37 @@ export const AdminDashboard = () => {
     fetchProductos();
   };
 
-  // LÓGICA PARA INSERTAR EL NUEVO PRODUCTO EN SUPABASE
+  // ABRE EL MODAL EN MODO EDICIÓN RELLENANDO LOS CAMPOS
+  const abrirModalEditar = (producto: Producto) => {
+    setModalMode('edit');
+    setIdProductoSeleccionado(producto.id);
+    setNuevoProducto({
+      nombre: producto.nombre,
+      precio: producto.precio.toString(),
+      descripcion: producto.descripcion || '',
+      stock: producto.stock.toString(),
+      imagen_url: producto.imagen_url || '',
+      categoria: mapCategoriaToFrontend(producto.categoria)
+    });
+    setIsModalOpen(true);
+  };
+
+  // ABRE EL MODAL EN MODO CREACIÓN
+  const abrirModalCrear = () => {
+    setModalMode('create');
+    setIdProductoSeleccionado(null);
+    setNuevoProducto({
+      nombre: '',
+      precio: '',
+      descripcion: '',
+      stock: '',
+      imagen_url: '',
+      categoria: 'Desayunos'
+    });
+    setIsModalOpen(true);
+  };
+
+  // LÓGICA UNIFICADA PARA INSERTAR O ACTUALIZAR PRODUCTO
   const handleGuardarProducto = async (e: React.FormEvent) => {
     e.preventDefault();
     setGuardandoProducto(true);
@@ -152,49 +199,54 @@ export const AdminDashboard = () => {
     }
 
     try {
-      // 🚀 BLINDAJE: Limpiamos la categoría quitando tildes y mayúsculas de manera exacta
+      // 🚀 BLINDAJE: Limpiamos la categoría quitando tildes y mayúsculas
       const categoriaLimpia = nuevoProducto.categoria
         .toLowerCase()
         .trim()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
 
-      const { error } = await supabase
-        .from('productos')
-        .insert([
-          {
-            nombre: nuevoProducto.nombre,
-            precio: parseInt(nuevoProducto.precio),
-            descripcion: nuevoProducto.descripcion || 'Tradicional y calientito',
-            stock: parseInt(nuevoProducto.stock),
-            imagen_url: nuevoProducto.imagen_url || 'https://th.bing.com/th/id/OIP.8-L_OC7-C9X3A63A50B0F9B',
-            categoria: categoriaLimpia // Se guarda "linea amarilla", "panaderia", etc.
-          }
-        ]);
+      const payload = {
+        nombre: nuevoProducto.nombre,
+        precio: parseInt(nuevoProducto.precio),
+        descripcion: nuevoProducto.descripcion || 'Tradicional y calientito',
+        stock: parseInt(nuevoProducto.stock),
+        imagen_url: nuevoProducto.imagen_url || 'https://th.bing.com/th/id/OIP.8-L_OC7-C9X3A63A50B0F9B',
+        categoria: categoriaLimpia
+      };
 
-      if (error) throw error;
+      if (modalMode === 'create') {
+        // INSERTAR NUEVO
+        const { error } = await supabase.from('productos').insert([payload]);
+        if (error) throw error;
 
-      Swal.fire({
-        icon: 'success',
-        title: '¡Producto Agregado!',
-        text: `"${nuevoProducto.nombre}" ya está en el inventario de Cayena.`,
-        timer: 2000,
-        showConfirmButton: false,
-        customClass: { popup: 'rounded-[30px]' }
-      });
+        Swal.fire({
+          icon: 'success',
+          title: '¡Producto Agregado!',
+          text: `"${nuevoProducto.nombre}" ya está en la carta de Cayena.`,
+          timer: 2000,
+          showConfirmButton: false,
+          customClass: { popup: 'rounded-[30px]' }
+        });
+      } else {
+        // ACTUALIZAR EXISTENTE
+        const { error } = await supabase
+          .from('productos')
+          .update(payload)
+          .eq('id', idProductoSeleccionado);
+        if (error) throw error;
 
-      // Limpiar formulario y cerrar modal
-      setNuevoProducto({
-        nombre: '',
-        precio: '',
-        descripcion: '',
-        stock: '',
-        imagen_url: '',
-        categoria: 'Desayunos'
-      });
+        Swal.fire({
+          icon: 'success',
+          title: '¡Producto Actualizado!',
+          text: `Los cambios en "${nuevoProducto.nombre}" se guardaron correctamente.`,
+          timer: 2000,
+          showConfirmButton: false,
+          customClass: { popup: 'rounded-[30px]' }
+        });
+      }
+
       setIsModalOpen(false);
-      
-      // Recargar lista local de productos de inmediato
       fetchProductos();
 
     } catch (error: any) {
@@ -207,6 +259,46 @@ export const AdminDashboard = () => {
     } finally {
       setGuardandoProducto(false);
     }
+  };
+
+  // LÓGICA PARA ELIMINAR UN PRODUCTO DEL INVENTARIO
+  const handleEliminarProducto = async (id: string, nombre: string) => {
+    Swal.fire({
+      title: '¿Estás completamente seguro?',
+      text: `Vas a eliminar "${nombre}" de la base de datos de Cayena. Esta acción no se puede deshacer.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#b49770',
+      confirmButtonText: 'Sí, eliminarlo',
+      cancelButtonText: 'Cancelar',
+      customClass: { popup: 'rounded-[30px]' }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const { error } = await supabase.from('productos').delete().eq('id', id);
+          if (error) throw error;
+
+          Swal.fire({
+            title: '¡Eliminado!',
+            text: 'El producto fue removido correctamente.',
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false,
+            customClass: { popup: 'rounded-[30px]' }
+          });
+
+          fetchProductos();
+        } catch (error: any) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error al eliminar',
+            text: error.message || 'No se pudo eliminar el producto.',
+            customClass: { popup: 'rounded-[30px]' }
+          });
+        }
+      }
+    });
   };
 
   // 📄 FUNCIÓN MEJORADA: Anti-bloqueo de popups y carga asíncrona segura
@@ -318,7 +410,7 @@ export const AdminDashboard = () => {
     }
   };
 
-  // 🛠️ FILTRADO DINÁMICO DE PEDIDOS ANTES DE AGRUPARLOS
+  // 🛠️ FILTRADO DINÁMICO DE PEDIDOS
   const pedidosFiltrados = pedidos.filter((pedido) => {
     if (!pedido.created_at) return false;
     const fechaPedidoStr = pedido.created_at.split('T')[0];
@@ -532,14 +624,13 @@ export const AdminDashboard = () => {
         {/* PESTAÑA 2: INVENTARIO */}
         {activeTab === 'inventario' && (
           <div className="space-y-10">
-            {/* CABECERA DE INVENTARIO CON BOTÓN UNIFICADO */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 dark:border-slate-800 pb-4">
               <div>
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Administrar Productos 🥖</h2>
                 <p className="text-sm text-gray-400 mt-1">Inventario total clasificado por líneas de producción.</p>
               </div>
               <button
-                onClick={() => setIsModalOpen(true)}
+                onClick={abrirModalCrear}
                 className="bg-[#b49770] hover:bg-[#c4a67d] text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-md transition-all active:scale-95 text-sm"
               >
                 <Plus size={18} />
@@ -559,13 +650,34 @@ export const AdminDashboard = () => {
                       <h3 className="text-base font-black text-[#b49770] uppercase tracking-widest flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[#b49770]"></span>{cat}</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {productosFiltrados.map((prod) => (
-                          <div key={prod?.id} className="p-5 border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 rounded-2xl flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
-                            <div>
-                              <h4 className="font-bold text-lg text-gray-800 dark:text-slate-100 capitalize">{prod?.nombre || 'Producto sin nombre'}</h4>
-                              <p className="text-sm text-[#b49770] font-bold">${(prod?.precio || 0).toLocaleString('es-CO')}</p>
+                          <div key={prod?.id} className="p-5 border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 rounded-2xl flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow group relative">
+                            
+                            {/* BOTONES DE EDICIÓN Y ELIMINACIÓN RÁPIDA */}
+                            <div className="absolute top-4 right-4 flex gap-1.5 opacity-80 lg:opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                              <button 
+                                onClick={() => abrirModalEditar(prod)}
+                                className="p-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-xl transition shadow-sm"
+                                title="Editar producto"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button 
+                                onClick={() => handleEliminarProducto(prod.id, prod.nombre)}
+                                className="p-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition shadow-sm"
+                                title="Eliminar producto"
+                              >
+                                <Trash2 size={14} />
+                              </button>
                             </div>
-                            <div className="mt-4 flex items-center justify-between gap-4">
-                              <span className="text-xs text-gray-400 font-bold uppercase">Stock Disponible:</span>
+
+                            <div>
+                              <h4 className="font-bold text-lg text-gray-800 dark:text-slate-100 capitalize pr-16">{prod?.nombre || 'Producto sin nombre'}</h4>
+                              <p className="text-sm text-[#b49770] font-bold mt-0.5">${(prod?.precio || 0).toLocaleString('es-CO')}</p>
+                              {prod.descripcion && <p className="text-xs text-gray-400 line-clamp-2 mt-2 font-medium">{prod.descripcion}</p>}
+                            </div>
+                            
+                            <div className="mt-5 flex items-center justify-between gap-4 border-t border-gray-100 dark:border-slate-900 pt-3">
+                              <span className="text-xs text-gray-400 font-bold uppercase">Stock:</span>
                               <input type="number" defaultValue={prod?.stock || 0} onBlur={(e) => actualizarStock(prod?.id, parseInt(e.target.value) || 0)} className="w-20 p-2 text-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl text-gray-800 dark:text-slate-100 font-bold focus:ring-2 focus:ring-[#b49770]" />
                             </div>
                           </div>
@@ -586,16 +698,18 @@ export const AdminDashboard = () => {
 
       </div>
 
-      {/* MODAL PARA NUEVO PRODUCTO (SOPORTE LIGHT/DARK MODE) */}
+      {/* MODAL PARA AGREGAR / EDITAR PRODUCTO */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-[35px] w-full max-w-lg p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto border border-gray-100 dark:border-slate-800">
             
             <h3 className="text-2xl font-black text-gray-800 dark:text-slate-100 mb-2 flex items-center gap-2">
               <Package className="text-[#b49770]" size={24} />
-              Nuevo Producto
+              {modalMode === 'create' ? 'Nuevo Producto' : 'Editar Producto'}
             </h3>
-            <p className="text-gray-400 dark:text-slate-400 text-sm mb-6">Completa los datos para guardarlo directo en el inventario.</p>
+            <p className="text-gray-400 dark:text-slate-400 text-sm mb-6">
+              {modalMode === 'create' ? 'Completa los datos para guardarlo directo en el inventario.' : 'Modifica los valores del producto seleccionado.'}
+            </p>
 
             <form onSubmit={handleGuardarProducto} className="space-y-4 text-left">
               {/* NOMBRE */}
@@ -705,7 +819,7 @@ export const AdminDashboard = () => {
                   disabled={guardandoProducto}
                   className="flex-1 bg-[#b49770] hover:bg-[#a3865f] text-white py-3 rounded-2xl font-bold text-sm shadow-md transition disabled:opacity-50"
                 >
-                  {guardandoProducto ? 'Guardando...' : 'Guardar Producto'}
+                  {guardandoProducto ? 'Guardando...' : modalMode === 'create' ? 'Guardar Producto' : 'Guardar Cambios'}
                 </button>
               </div>
             </form>
